@@ -4509,6 +4509,49 @@ impl Shell {
     where
         CosmicSurface: PartialEq<S>,
     {
+        // Check if the surface is already fullscreen
+        let fullscreen_info = self.workspaces.spaces()
+            .enumerate()
+            .find_map(|(idx, w)| {
+                w.get_fullscreen().and_then(|fs| {
+                    if fs == surface {
+                        Some((idx, w.output.clone()))
+                    } else {
+                        None
+                    }
+                })
+            });
+
+        if let Some((current_ws_idx, current_output)) = fullscreen_info {
+            // If already fullscreen on the requested output, nothing to do
+            if current_output == output {
+                let workspace = self.workspaces.spaces().nth(current_ws_idx).unwrap();
+                return Some(KeyboardFocusTarget::Fullscreen(
+                    workspace.get_fullscreen().unwrap().clone()
+                ));
+            }
+
+            // Surface is fullscreen on a different output - need to move it
+            let (window, restore_state, previous_geometry) = {
+                let workspace = self.workspaces.spaces_mut().nth(current_ws_idx).unwrap();
+                workspace.remove_fullscreen().unwrap()
+            };
+
+            toplevel_leave_output(&window, &current_output);
+            let current_workspace_handle = self.workspaces.spaces().nth(current_ws_idx).unwrap().handle;
+            toplevel_leave_workspace(&window, &current_workspace_handle);
+
+            // Now map it as fullscreen on the requested output
+            let target_workspace = self.active_space_mut(&output).unwrap();
+            let workspace_handle = target_workspace.handle;
+            toplevel_enter_output(&window, &output);
+            toplevel_enter_workspace(&window, &workspace_handle);
+
+            target_workspace.map_fullscreen(&window, None, restore_state, previous_geometry);
+
+            return Some(KeyboardFocusTarget::Fullscreen(window));
+        }
+
         let mapped = self.element_for_surface(surface).cloned()?;
         let window;
 
