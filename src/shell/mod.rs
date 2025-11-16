@@ -4510,24 +4510,22 @@ impl Shell {
         CosmicSurface: PartialEq<S>,
     {
         // Check if the surface is already fullscreen
-        let fullscreen_info = self.workspaces.spaces()
-            .enumerate()
-            .find_map(|(idx, w)| {
-                w.get_fullscreen().and_then(|fs| {
-                    if fs == surface {
-                        Some((idx, w.output.clone()))
-                    } else {
-                        None
-                    }
-                })
-            });
+        let fullscreen_info = self.workspaces.spaces().enumerate().find_map(|(idx, w)| {
+            w.get_fullscreen().and_then(|fs| {
+                if fs == surface {
+                    Some((idx, w.output.clone()))
+                } else {
+                    None
+                }
+            })
+        });
 
         if let Some((current_ws_idx, current_output)) = fullscreen_info {
             // If already fullscreen on the requested output, nothing to do
             if current_output == output {
                 let workspace = self.workspaces.spaces().nth(current_ws_idx).unwrap();
                 return Some(KeyboardFocusTarget::Fullscreen(
-                    workspace.get_fullscreen().unwrap().clone()
+                    workspace.get_fullscreen().unwrap().clone(),
                 ));
             }
 
@@ -4538,7 +4536,8 @@ impl Shell {
             };
 
             toplevel_leave_output(&window, &current_output);
-            let current_workspace_handle = self.workspaces.spaces().nth(current_ws_idx).unwrap().handle;
+            let current_workspace_handle =
+                self.workspaces.spaces().nth(current_ws_idx).unwrap().handle;
             toplevel_leave_workspace(&window, &current_workspace_handle);
 
             // Now map it as fullscreen on the requested output
