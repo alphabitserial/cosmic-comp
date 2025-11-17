@@ -1206,11 +1206,31 @@ impl Workspace {
         Option<FullscreenRestoreState>,
         Option<Rectangle<i32, Local>>,
     )> {
-        let res = self.remove_fullscreen();
+        // Check if this window is already fullscreen on this workspace
+        let already_fullscreen = self.get_fullscreen() == Some(window);
 
+        // Check current state before we modify it
+        let was_pending_fullscreen = window.is_fullscreen(true);
+
+        // Only remove existing fullscreen if it's a different window
+        // This prevents sending unnecessary unfullscreen->fullscreen configure events
+        // which can cause state desynchronization in clients like Chromium
+        let res = if already_fullscreen {
+            None
+        } else {
+            self.remove_fullscreen()
+        };
+
+        // Always update state and geometry, even if already fullscreen
+        // This ensures the window has the correct configuration
         window.set_fullscreen(true);
         window.set_geometry(self.output.geometry(), 0);
-        window.send_configure();
+
+        // Only send configure if state actually changed
+        // Skip redundant configure events for windows already in fullscreen state
+        if !already_fullscreen || !was_pending_fullscreen {
+            window.send_configure();
+        }
         window.output_enter(
             &self.output,
             Rectangle::new(Point::new(0, 0), self.output.geometry().size.as_logical()),
